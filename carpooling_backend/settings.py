@@ -1,6 +1,8 @@
 from datetime import timedelta
 from pathlib import Path
+import dj_database_url
 from decouple import config
+
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -62,15 +64,9 @@ WSGI_APPLICATION = 'carpooling_backend.wsgi.application'
 
 # Base de datos
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('PGDATABASE'),
-        'USER': config('PGUSER'),
-        'PASSWORD': config('PGPASSWORD'),
-        'HOST': config('PGHOST'),
-        'PORT': config('PGPORT'),
-    }
+    'default': dj_database_url.config(default=config('DATABASE_URL'), conn_max_age=600)
 }
+
 
 
 
