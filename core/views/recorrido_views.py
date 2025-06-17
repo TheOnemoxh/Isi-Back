@@ -5,9 +5,9 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 
 from core.models import Recorrido, SolicitudDeViaje
-from core.serializers import RecorridoSerializer, PasajeroAceptadoSerializer
+from core.serializers import RecorridoSerializer, PasajeroAceptadoSerializer, RecorridoDetalleSerializer
 from core.utils.precios import calcular_precio_por_pasajero
-from core.utils.geo import geocodificar_direccion, calcular_distancia_km
+from core.utils.geo import geocodificar_direccion, calcular_distancia_km, obtener_ruta
 
 
 class RecorridoView(APIView):
@@ -22,27 +22,28 @@ class RecorridoView(APIView):
         if not request.user.es_conductor:
             return Response({'detalle': 'Solo los conductores pueden crear recorridos.'}, status=403)
 
-        serializer = RecorridoSerializer(data=request.data)
+        data = request.data.copy()
+
+        try:
+            origen_coords = (float(data.get('origen_lat')), float(data.get('origen_lon')))
+            destino_coords = (float(data.get('destino_lat')), float(data.get('destino_lon')))
+            distancia = calcular_distancia_km(origen_coords, destino_coords)
+            data['distancia_km'] = distancia
+
+            # ✅ Cálculo del precio total del recorrido
+            precio_total = distancia * 2500
+            data['precio_total'] = precio_total
+
+        except Exception as e:
+            print("❌ Error al calcular distancia:", e)
+            return Response({'detalle': 'Error en los datos de coordenadas para calcular la distancia.'}, status=400)
+
+        serializer = RecorridoSerializer(data=data)
         if serializer.is_valid():
             recorrido = serializer.save(conductor=request.user)
-
-            # 🔍 Obtener coordenadas
-            lat_o, lon_o = geocodificar_direccion(recorrido.origen)
-            lat_d, lon_d = geocodificar_direccion(recorrido.destino)
-
-            # 📏 Calcular distancia real
-            distancia = calcular_distancia_km((lat_o, lon_o), (lat_d, lon_d))
-
-            # 💾 Guardar en la base de datos
-            recorrido.lat_origen = lat_o
-            recorrido.lon_origen = lon_o
-            recorrido.lat_destino = lat_d
-            recorrido.lon_destino = lon_d
-            recorrido.distancia_km = distancia
-            recorrido.save()
-
             return Response(RecorridoSerializer(recorrido).data, status=201)
         return Response(serializer.errors, status=400)
+
 
 
 class PrecioPorPasajeroView(APIView):
@@ -79,7 +80,7 @@ class CambiarEstadoRecorridoView(APIView):
         if recorrido.conductor != request.user:
             return Response({'detalle': 'No tienes permiso para modificar este recorrido.'}, status=403)
 
-        if nuevo_estado not in ['en_curso', 'completado']:
+        if nuevo_estado not in ['en_curso', 'completado', 'cancelado']:
             return Response({'detalle': 'Estado inválido.'}, status=400)
 
         recorrido.estado = nuevo_estado
@@ -87,12 +88,14 @@ class CambiarEstadoRecorridoView(APIView):
 
         return Response({'mensaje': f'Recorrido marcado como "{nuevo_estado}".'})
 
+
 class RecorridoMapaView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, recorrido_id):
         recorrido = get_object_or_404(Recorrido, pk=recorrido_id)
 
+        # Validar que sea el conductor o uno de los pasajeros
         if request.user != recorrido.conductor and not SolicitudDeViaje.objects.filter(recorrido=recorrido, pasajero=request.user).exists():
             return Response({'detalle': 'No tienes permiso para ver este mapa.'}, status=403)
 
@@ -101,11 +104,15 @@ class RecorridoMapaView(APIView):
         data = {
             "recorrido": {
                 "origen": recorrido.origen,
-                "lat_origen": recorrido.lat_origen,
-                "lon_origen": recorrido.lon_origen,
+                "lat_origen": recorrido.origen_lat,
+                "lon_origen": recorrido.origen_lon,
                 "destino": recorrido.destino,
-                "lat_destino": recorrido.lat_destino,
-                "lon_destino": recorrido.lon_destino,
+                "lat_destino": recorrido.destino_lat,
+                "lon_destino": recorrido.destino_lon,
+
+                # 👇 Agregamos la ubicación actual del conductor
+                "lat_conductor": recorrido.ubicacion_actual_lat,
+                "lon_conductor": recorrido.ubicacion_actual_lon,
             },
             "pasajeros": [
                 {
@@ -125,7 +132,6 @@ class RecorridoMapaView(APIView):
         return Response(data)
 
 
-from core.utils.geo import obtener_ruta_coords
 
 class RutaRecorridoView(APIView):
     permission_classes = [IsAuthenticated]
@@ -139,11 +145,10 @@ class RutaRecorridoView(APIView):
         origen = (recorrido.lon_origen, recorrido.lat_origen)
         destino = (recorrido.lon_destino, recorrido.lat_destino)
 
-        ruta = obtener_ruta_coords(origen, destino)
+        ruta = obtener_ruta(origen, destino)
 
         return Response({"ruta": ruta})
 
-from core.serializers import RecorridoDetalleSerializer
 
 class RecorridoDetalleView(APIView):
     permission_classes = [IsAuthenticated]
