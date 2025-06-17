@@ -11,8 +11,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY')
 
 DEBUG = config('DEBUG', default=False, cast=bool)
-
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
+DEBUG = False
+ALLOWED_HOSTS = ['3.145.95.225', 'localhost']
 
 APPEND_SLASH = False
 
@@ -64,12 +64,21 @@ WSGI_APPLICATION = 'carpooling_backend.wsgi.application'
 
 
 # Base de datos
+import os
+from decouple import config
+import dj_database_url
+
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get("DATABASE_URL"),
-        conn_max_age=600
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'carpooling_db',
+        'USER': 'carpool_user',
+        'PASSWORD': 'carpool123',  # usa aquí la contraseña que asignaste
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
 }
+
 
 
 # Validación de contraseñas
