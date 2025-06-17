@@ -64,7 +64,7 @@ WSGI_APPLICATION = 'carpooling_backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('PGNAME'),
+        'NAME': config('PGDATABASE'),
         'USER': config('PGUSER'),
         'PASSWORD': config('PGPASSWORD'),
         'HOST': config('PGHOST'),
