@@ -63,13 +63,13 @@ TEMPLATES = [
 WSGI_APPLICATION = 'carpooling_backend.wsgi.application'
 
 
-
-DATABASE_URL = os.environ['DATABASE_URL']  # Esto sí lanza error si no está definida
-
+# Base de datos
 DATABASES = {
-    'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    'default': dj_database_url.config(
+        default=os.environ.get("DATABASE_URL"),
+        conn_max_age=600
+    )
 }
-
 
 
 # Validación de contraseñas
@@ -138,5 +138,3 @@ OPENROUTESERVICE_API_KEY = config('OPENROUTESERVICE_API_KEY', default='')
 
 # CORS (permite llamadas desde cualquier frontend durante desarrollo)
 CORS_ALLOW_ALL_ORIGINS = True  # ¡Desactiva esto en producción si usas dominios específicos!
-print("== VARIABLES DE ENTORNO ==")
-print(dict(os.environ))
