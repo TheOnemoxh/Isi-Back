@@ -1,7 +1,9 @@
 from datetime import timedelta
 from pathlib import Path
 import dj_database_url
-from decouple import config
+import os
+
+
 
 
 
@@ -64,10 +66,11 @@ WSGI_APPLICATION = 'carpooling_backend.wsgi.application'
 
 # Base de datos
 DATABASES = {
-    'default': dj_database_url.config(default=config('DATABASE_URL'), conn_max_age=600)
+    'default': dj_database_url.config(
+        default=os.environ.get("DATABASE_URL"),
+        conn_max_age=600
+    )
 }
-
-
 
 
 # Validación de contraseñas
